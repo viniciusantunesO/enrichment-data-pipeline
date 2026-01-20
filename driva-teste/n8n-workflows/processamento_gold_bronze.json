@@ -1,0 +1,121 @@
+{
+  "name": "processamento_gold_bronze",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  id_enriquecimento,\n  payload\nFROM bronze_enrichments;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        416,
+        0
+      ],
+      "id": "b766e9d8-56bf-4dd2-8f5c-dc90b136dddc",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "zGN0P1F6tssEuJAO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.map(({ json }) => {\n  const p = typeof json.payload === 'string'\n    ? JSON.parse(json.payload)\n    : json.payload;\n\n  const inicio = new Date(p.created_at);\n  const fim = new Date(p.updated_at);\n  const duracao = (fim - inicio) / 60000;\n\n  const tipoContato =\n    p.contact_type === \"PERSON\" ? \"PESSOA\" : \"EMPRESA\";\n\n  const statusMap = {\n    PROCESSING: \"EM_PROCESSAMENTO\",\n    COMPLETED: \"CONCLUIDO\",\n    FAILED: \"FALHOU\",\n    CANCELED: \"CANCELADO\",\n  };\n\n  const statusProcessamento = statusMap[p.status] || \"DESCONHECIDO\";\n\n  let categoria;\n  if (p.total_contacts < 100) categoria = \"PEQUENO\";\n  else if (p.total_contacts <= 500) categoria = \"MEDIO\";\n  else if (p.total_contacts <= 1000) categoria = \"GRANDE\";\n  else categoria = \"MUITO_GRANDE\";\n\n  return {\n    json: {\n      id_enriquecimento: json.id_enriquecimento,\n      id_workspace: p.id_workspace,\n      nome_workspace: p.workspace_name,\n      total_contatos: p.total_contacts,\n      tipo_contato: tipoContato,\n      status_processamento: statusProcessamento,\n      data_criacao: p.created_at,\n      data_atualizacao: p.updated_at,\n      duracao_processamento_minutos: duracao,\n      tempo_por_contato_minutos: duracao / p.total_contacts,\n      processamento_sucesso: p.status === \"COMPLETED\",\n      necessita_reprocessamento: [\"FAILED\", \"CANCELED\"].includes(p.status),\n      categoria_tamanho_job: categoria,\n      data_atualizacao_dw: new Date().toISOString(),\n    }\n  };\n});\n\n\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        0
+      ],
+      "id": "04b9fba4-afbf-4f2f-a0d3-74ae387272ad",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO gold_enrichments (\n  id_enriquecimento,\n  id_workspace,\n  nome_workspace,\n  total_contatos,\n  tipo_contato,\n  status_processamento,\n  data_criacao,\n  data_atualizacao,\n  duracao_processamento_minutos,\n  tempo_por_contato_minutos,\n  processamento_sucesso,\n  necessita_reprocessamento,\n  categoria_tamanho_job,\n  data_atualizacao_dw\n)\nVALUES (\n  '{{$json.id_enriquecimento}}',\n  '{{$json.id_workspace}}',\n  '{{$json.nome_workspace}}',\n  {{$json.total_contatos}},\n  '{{$json.tipo_contato}}',\n  '{{$json.status_processamento || \"DESCONHECIDO\"}}',\n  '{{$json.data_criacao}}',\n  '{{$json.data_atualizacao}}',\n  {{$json.duracao_processamento_minutos}},\n  {{$json.tempo_por_contato_minutos}},\n  {{$json.processamento_sucesso}},\n  {{$json.necessita_reprocessamento}},\n  '{{$json.categoria_tamanho_job}}',\n  NOW()\n)\nON CONFLICT (id_enriquecimento)\nDO UPDATE SET\n  status_processamento = EXCLUDED.status_processamento,\n  data_atualizacao = EXCLUDED.data_atualizacao,\n  duracao_processamento_minutos = EXCLUDED.duracao_processamento_minutos,\n  tempo_por_contato_minutos = EXCLUDED.tempo_por_contato_minutos,\n  data_atualizacao_dw = EXCLUDED.data_atualizacao_dw;\n\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        832,
+        0
+      ],
+      "id": "d4c631d8-8888-41d6-9352-477375175508",
+      "name": "Execute a SQL query1",
+      "credentials": {
+        "postgres": {
+          "id": "zGN0P1F6tssEuJAO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        176,
+        0
+      ],
+      "id": "84a42a6f-a37c-4664-9e7d-7a7cfcb6605d",
+      "name": "When Executed by Another Workflow"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "f664ef6c-e9c9-4901-a9f4-1eecc458099e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3fed6d71ebfb46aa0ebb46eae7b1960b070dd8a2f9095d54275974506f9981b4"
+  },
+  "id": "dx-7ZPPvOEqdOpN0vHAM_",
+  "tags": []
+}

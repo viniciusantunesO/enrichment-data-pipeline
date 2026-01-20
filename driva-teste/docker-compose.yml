@@ -1,0 +1,38 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: driva_postgres
+    environment:
+      POSTGRES_USER: driva
+      POSTGRES_PASSWORD: driva
+      POSTGRES_DB: driva_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  api:
+    build: ./api
+    container_name: driva_api
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+
+  n8n:
+    image: n8nio/n8n
+    container_name: driva_n8n
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      - postgres
+      - api
+
+volumes:
+  postgres_data:
+  n8n_data:

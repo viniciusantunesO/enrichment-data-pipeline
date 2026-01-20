@@ -1,0 +1,375 @@
+{
+  "name": "ingestao_api_bronze",
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2c6c0968-4f05-4723-b344-546345499d5f",
+              "name": "page",
+              "value": 1,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -672,
+        -112
+      ],
+      "id": "e5ec5163-e18a-43ab-a69f-1814ce659c95",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "87a217a1-17f1-4aa6-a8ed-904b89d6dac3",
+              "leftValue": "={{$json.error?.statusCode}}",
+              "rightValue": 429,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -64,
+        -112
+      ],
+      "id": "d743e907-a0ed-4752-b25b-58ce46d0abe6",
+      "name": "If"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        128,
+        -128
+      ],
+      "id": "74c19fa4-7f05-426a-ac38-4b604c20127c",
+      "name": "Wait",
+      "webhookId": "483173a7-9b9a-4b2f-a5ce-8e008d0d8093"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -416,
+        144
+      ],
+      "id": "89e8dcae-75c8-4e22-a0b2-52bb00d76e69",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "name": "Replace Me",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        240
+      ],
+      "id": "3674802f-f777-408d-90d8-2aea1ab77c46"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO bronze_enrichments (\n  id_enriquecimento,\n  payload,\n  dw_ingested_at,\n  dw_updated_at\n)\nVALUES (\n  '{{$json.id}}',\n  '{{ JSON.stringify($json) }}'::jsonb,\n  NOW(),\n  NOW()\n)\nON CONFLICT (id_enriquecimento)\nDO UPDATE SET\n  payload = EXCLUDED.payload,\n  dw_updated_at = NOW();\n\n\n\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -80,
+        128
+      ],
+      "id": "13975722-2e4a-43b8-805b-a2521ec6d079",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "zGN0P1F6tssEuJAO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// o HTTP Request retorna { meta, data }\n// aqui transformamos data[] em itens individuais\n\nreturn items[0].json.data.map(e => {\n  return { json: e };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -256,
+        -112
+      ],
+      "id": "5e4c6561-e52c-4971-858a-c9252677a9c1",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "83bc335c-9267-4882-9b05-296d47e5c67d",
+              "leftValue": "={{$node[\"Get Enrichments\"].json.meta.current_page}}",
+              "rightValue": "={{$node[\"Get Enrichments\"].json.meta.total_pages}}",
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        128,
+        128
+      ],
+      "id": "e5c8c8c0-3a8d-4751-859b-19f6f7f64b6b",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "url": "http://api:3000/people/v1/enrichments",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "page",
+              "value": "={{$json.page}}"
+            },
+            {
+              "name": "limit",
+              "value": "50"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer driva_test_key_abc123xyz789"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -464,
+        -112
+      ],
+      "id": "5dec9e90-1758-4291-95d0-53010c6508a0",
+      "name": "Get Enrichments"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b026d604-e65e-465d-bdc5-62840ca4eb0d",
+              "name": "page",
+              "value": "={{ $('Edit Fields').item.json.page+1 }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        336,
+        32
+      ],
+      "id": "f87a7bed-82a8-4f5c-89e7-6c746e0aff06",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -896,
+        -112
+      ],
+      "id": "21ed4403-736c-4969-98f5-11d8ff8fc921",
+      "name": "When Executed by Another Workflow"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Get Enrichments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Get Enrichments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Replace Me",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Replace Me": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Enrichments": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "29da851c-a540-417c-98dd-89ec366fb8a9",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3fed6d71ebfb46aa0ebb46eae7b1960b070dd8a2f9095d54275974506f9981b4"
+  },
+  "id": "I4sOG-BpGfbMuwFyXqakF",
+  "tags": []
+}
