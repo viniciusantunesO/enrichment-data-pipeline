@@ -1,27 +1,79 @@
 # enrichment-data-pipeline
-Desafio Técnico – Pipeline de Dados
+# Desafio Técnico – Pipeline de Dados
 
-Este projeto implementa um pipeline de dados completo conforme especificado no enunciado do desafio técnico, integrando uma API REST, orquestração com n8n e um Data Warehouse com modelagem em camadas Bronze e Gold. O objetivo do projeto é demonstrar boas práticas de engenharia de dados, organização de workflows, clareza arquitetural e funcionamento ponta a ponta.
+Este projeto implementa um pipeline de dados completo conforme especificado no enunciado do desafio técnico da Driva, integrando uma API REST, orquestração com n8n e um Data Warehouse com modelagem em camadas Bronze e Gold.  
+O objetivo do projeto é demonstrar boas práticas de engenharia de dados, organização de workflows, clareza arquitetural e funcionamento ponta a ponta.
 
-Funcionamento do pipeline
+---
 
-A solução funciona de forma automatizada a partir de uma API que expõe dados de enriquecimentos com autenticação e paginação. O n8n consome essa API em execuções recorrentes configuradas para rodar a cada cinco minutos. Os dados coletados são armazenados inicialmente na camada Bronze do Data Warehouse sem qualquer transformação. Em seguida, o próprio n8n executa o processo de transformação e consolidação dos dados, gravando o resultado final na camada Gold, que é utilizada para análises e consumo posterior.
+## Funcionamento do Pipeline
 
-Modelagem de dados
+A solução funciona de forma automatizada a partir de uma API que expõe dados de enriquecimentos com autenticação e paginação.
 
-A modelagem do Data Warehouse segue o padrão solicitado no enunciado. A camada Bronze armazena os dados brutos exatamente como recebidos da API, preservando histórico completo e permitindo reprocessamentos futuros. A camada Gold contém dados tratados, consolidados e prontos para consumo analítico, com aplicação de idempotência para evitar duplicações em execuções recorrentes e com métricas derivadas relevantes para análise.
+O n8n consome essa API em execuções recorrentes configuradas para rodar a cada **cinco minutos**.  
+Os dados coletados são armazenados inicialmente na camada **Bronze** do Data Warehouse sem qualquer transformação.  
 
-API
+Em seguida, o próprio n8n executa o processo de transformação e consolidação dos dados, gravando o resultado final na camada **Gold**, que é utilizada para análises e consumo posterior.
 
-A API foi desenvolvida seguindo boas práticas REST. Os endpoints possuem autenticação via Bearer Token, suportam paginação por meio de parâmetros de página e limite e retornam metadados de controle. A API também simula falhas temporárias retornando erro 429 para permitir a validação de retry e backoff nos workflows do n8n. Existe ainda um endpoint de health check para verificação do status do serviço.
+---
 
-Workflows no n8n
+## Modelagem de Dados
 
-Os workflows foram construídos de forma organizada e modular, com execução automática a cada cinco minutos. Eles realizam a paginação completa da API, aplicam políticas de retry e backoff em caso de falhas, registram logs de execução e mantêm separação clara entre ingestão na camada Bronze e transformação para a camada Gold. Toda a lógica de orquestração e ETL está concentrada no n8n, mantendo a API simples e desacoplada.
+A modelagem do Data Warehouse segue o padrão solicitado no enunciado:
 
-Boas práticas e decisões técnicas
+- **Bronze**
+  - Armazena os dados brutos exatamente como recebidos da API
+  - Preserva o payload original em formato JSON
+  - Permite reprocessamentos futuros
+  - Contém campos técnicos de Data Warehouse (`dw_ingested_at`, `dw_updated_at`)
 
-Todos os timestamps do projeto são tratados em UTC para evitar inconsistências de fuso horário. A idempotência é garantida na camada Gold por meio do uso de identificadores únicos, impedindo duplicação de registros em execuções recorrentes. A separação de responsabilidades é mantida de forma clara, com a API responsável apenas por expor dados, o n8n responsável pela orquestração e transformação e o banco de dados responsável pela persistência e análise. O pipeline foi projetado para ser resiliente a falhas temporárias por meio de tratamento de erros e retries automáticos.
+- **Gold**
+  - Contém dados tratados, consolidados e prontos para consumo analítico
+  - Aplica regras de negócio simples
+  - Garante idempotência por meio de chave primária
+  - Possui métricas derivadas para análise (status, categorias, flags de sucesso)
+
+---
+
+## API
+
+A API foi desenvolvida seguindo boas práticas REST:
+
+- Autenticação via **Bearer Token**
+- Paginação através dos parâmetros `page` e `limit`
+- Retorno estruturado em `meta` + `data`
+- Simulação de erro **429 (Too Many Requests)** para validação de retry e backoff
+- Endpoint de **health check** para verificação do status do serviço
+
+## Workflows no n8n
+
+Os workflows foram construídos de forma organizada e modular:
+
+- Execução automática a cada **5 minutos**
+- Paginação completa da API
+- Tratamento de erro 429 com retry
+- Separação clara entre:
+  - Ingestão para camada Bronze
+  - Transformação e carga na camada Gold
+- Uso do node PostgreSQL para persistência
+- Logs visuais de execução para validação
+
+Toda a lógica de orquestração e ETL está concentrada no **n8n**, mantendo a API simples e desacoplada.
+
+---
+
+## Boas Práticas e Decisões Técnicas
+
+- Todos os timestamps são tratados em **UTC**
+- Idempotência garantida na camada Gold
+- Separação clara de responsabilidades:
+  - API: exposição dos dados
+  - n8n: orquestração e transformação
+  - Banco de dados: persistência e análise
+- Pipeline resiliente a falhas temporárias
+- Possibilidade de reprocessamento completo a partir da Bronze
+
+---
 
 Execução do projeto em ambiente local
 
